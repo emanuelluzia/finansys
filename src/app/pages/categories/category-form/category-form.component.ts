@@ -34,8 +34,16 @@ export class CategoryFormComponent implements OnInit {
     this.loadCategory();
   }
 
-  ngAfterContentChecked() { // just run after all the functions are alredy called
+  ngAfterContentChecked() {
+    // just run after all the functions are alredy called
     this.setPageTitle();
+  }
+
+  submitForm() {
+    this.submittingForm = true;
+
+    if (this.currentAction == "new") this.createCategory();
+    else this.updateCategory();
   }
 
   // PRIVATE METHODS
@@ -48,34 +56,72 @@ export class CategoryFormComponent implements OnInit {
     this.categoryForm = this.formBuilder.group({
       id: [null],
       name: [null, [Validators.required, Validators.minLength(2)]],
-      description: [null]
-    })
-   
+      description: [null],
+    });
   }
 
   private loadCategory() {
-    if(this.currentAction == "edit") {
-
-      this.route.paramMap.pipe(
-        switchMap(params=> this.categoryService.getById(+params.get("id")))
-      )
-      .subscribe(
-        (category) => {
-          this.category = category;
-          this.categoryForm.patchValue(category) //binds loaded category data to CategoryForm 
-        },
-        (error)=> alert('Ocorreu um erro no servidor, tente mais tarde.')
-      )
+    if (this.currentAction == "edit") {
+      this.route.paramMap
+        .pipe(
+          switchMap((params) => this.categoryService.getById(+params.get("id")))
+        )
+        .subscribe(
+          (category) => {
+            this.category = category;
+            this.categoryForm.patchValue(category); //binds loaded category data to CategoryForm
+          },
+          (error) => alert("Ocorreu um erro no servidor, tente mais tarde.")
+        );
     }
   }
 
   private setPageTitle() {
-    if(this.currentAction == 'new')
+    if (this.currentAction == "new")
       this.pageTitle = "registration of a new category";
-    else{
-      const categoryName = this.category.name || ""
-      this.pageTitle = "Category Editing:" + categoryName;
+    else {
+      const categoryName = this.category.name || "";
+      this.pageTitle = "Category Editing: " + categoryName;
     }
-    
+  }
+
+  private createCategory() {
+    const category: Category = Object.assign(new Category(), this.categoryForm.value);
+
+    this.categoryService.create(category).subscribe(
+      (category) => this.actionForSuccess(category),
+      (error) => this.actionsForError(error)
+    );
+  }
+
+  private updateCategory() {
+    const category: Category = Object.assign(new Category(), this.categoryForm.value);
+
+    this.categoryService.update(category)
+      .subscribe(
+        (category) => this.actionForSuccess(category),
+      (error) => this.actionsForError(error)
+    );
+
+  }
+
+  private actionForSuccess(category: Category) {
+    toastr.success("Success");
+
+    // redirect/reload component page
+    this.router
+      .navigateByUrl("categories", { skipLocationChange: true })
+      .then(() => this.router.navigate(["categories", category.id, "edit"]));
+  }
+
+  private actionsForError(error) {
+    toastr.error("Oops, something has gone wrong with your request");
+
+    this.submittingForm = false;
+
+    if(error.status === 422)
+      this.serverErrorMessages = JSON.parse(error._body).errors; 
+    else
+      this.serverErrorMessages = ['Oops, something has gone wrong, please try again later!'];
   }
 }
